@@ -1,10 +1,14 @@
 import { useState } from "react";
-import { Moon, Sun, Settings } from "lucide-react";
+import { Moon, Sun, Settings, LogOut, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
+import { useAuth } from "@/hooks/useAuth";
+import { formatDateInUserTimezone } from "@/lib/timezone";
 
 export const Header = () => {
   const { theme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
+  const today = formatDateInUserTimezone(new Date(), "EEEE, MMMM d, yyyy");
   
   return (
     <header className="sticky top-0 z-50 w-full bg-card/80 backdrop-blur-sm border-b border-border/50">
@@ -25,7 +29,18 @@ export const Header = () => {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
+          {/* Date Display */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CalendarDays className="h-4 w-4" />
+            <span>{today}</span>
+          </div>
+          
+          {/* User Info */}
+          <div className="text-sm text-muted-foreground">
+            Welcome, {user?.email}
+          </div>
+          
           {/* Theme Toggle */}
           <Button
             variant="ghost"
@@ -42,6 +57,17 @@ export const Header = () => {
           <Button variant="ghost" size="icon" className="hover:bg-muted focus-ring">
             <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>
+          </Button>
+          
+          {/* Sign Out */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={signOut}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
           </Button>
         </div>
       </div>

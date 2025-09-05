@@ -1,5 +1,8 @@
+import { useState, useEffect } from "react";
 import { CheckCircle, Target, BookOpen, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface StatCardProps {
   title: string;
@@ -45,33 +48,97 @@ const StatCard = ({
 };
 
 export const DashboardStats = () => {
-  // In a real app, these would come from your state/API
-  const stats = [
+  const [stats, setStats] = useState({
+    totalTodos: 0,
+    completedTodos: 0,
+    upcomingEvents: 0,
+    activeGoals: 0,
+    journalEntries: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      fetchStats();
+    }
+  }, [user]);
+
+  const fetchStats = async () => {
+    try {
+      const [todosRes, eventsRes, goalsRes, journalRes] = await Promise.all([
+        supabase.from("todos").select("completed").eq("user_id", user?.id),
+        supabase.from("events").select("id").eq("user_id", user?.id).gte("start_time", new Date().toISOString()),
+        supabase.from("goals").select("completed").eq("user_id", user?.id),
+        supabase.from("journal_entries").select("id").eq("user_id", user?.id)
+      ]);
+
+      const todos = todosRes.data || [];
+      const completedTodos = todos.filter(todo => todo.completed).length;
+      const goals = goalsRes.data || [];
+      const activeGoals = goals.filter(goal => !goal.completed).length;
+
+      setStats({
+        totalTodos: todos.length,
+        completedTodos,
+        upcomingEvents: eventsRes.data?.length || 0,
+        activeGoals,
+        journalEntries: journalRes.data?.length || 0
+      });
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completionRate = stats.totalTodos > 0 ? Math.round((stats.completedTodos / stats.totalTodos) * 100) : 0;
+
+  if (loading) {
+    return (
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="h-4 bg-muted rounded w-20"></div>
+              <div className="h-8 w-8 bg-muted rounded-lg"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 bg-muted rounded w-16 mb-2"></div>
+              <div className="h-3 bg-muted rounded w-24"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  const statsData = [
     {
       title: "Tasks Completed",
-      value: 12,
-      description: "3 more than yesterday",
+      value: stats.totalTodos > 0 ? `${stats.completedTodos}/${stats.totalTodos}` : "0",
+      description: stats.totalTodos > 0 ? `${completionRate}% completion rate` : "No tasks yet",
       icon: CheckCircle,
       color: "success" as const
     },
     {
       title: "Active Goals",
-      value: 5,
-      description: "2 nearing completion",
+      value: stats.activeGoals,
+      description: stats.activeGoals === 0 ? "No goals set yet" : `${stats.activeGoals} in progress`,
       icon: Target,
       color: "primary" as const
     },
     {
       title: "Journal Entries",
-      value: 28,
-      description: "This month",
+      value: stats.journalEntries,
+      description: stats.journalEntries === 0 ? "Start journaling!" : "Total entries",
       icon: BookOpen,
       color: "secondary" as const
     },
     {
-      title: "Weekly Progress",
-      value: "73%",
-      description: "Above average week",
+      title: "Upcoming Events",
+      value: stats.upcomingEvents,
+      description: stats.upcomingEvents === 0 ? "No events scheduled" : "This week",
       icon: Calendar,
       color: "warning" as const
     }
@@ -79,7 +146,7 @@ export const DashboardStats = () => {
 
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat, index) => (
+      {statsData.map((stat, index) => (
         <div key={stat.title} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
           <StatCard {...stat} />
         </div>
